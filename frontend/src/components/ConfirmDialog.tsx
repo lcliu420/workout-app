@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -41,9 +41,7 @@ export default function ConfirmDialog({
                   </div>
                   <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">{title}</h3>
                 </div>
-                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
-                  {message}
-                </p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed">{message}</p>
               </div>
               <div className="flex border-t border-slate-100 dark:border-slate-800">
                 <button

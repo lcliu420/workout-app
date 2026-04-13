@@ -1,5 +1,5 @@
-import { CalendarDays, BarChart3, User } from 'lucide-react';
-import { View } from '../types';
+import { BarChart3, CalendarDays, User } from 'lucide-react';
+import type { View } from '../types';
 
 interface BottomNavBarProps {
   activeView: View;
@@ -9,12 +9,12 @@ interface BottomNavBarProps {
 export default function BottomNavBar({ activeView, onViewChange }: BottomNavBarProps) {
   const tabs = [
     { id: 'plan' as View, label: '计划', icon: CalendarDays },
-    { id: 'summary' as View, label: '汇总', icon: BarChart3 },
+    { id: 'summary' as View, label: '总览', icon: BarChart3 },
     { id: 'account' as View, label: '账户', icon: User },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center pt-2 pb-6 px-4 bg-white/80 dark:bg-slate-950/80 backdrop-blur-md border-t border-slate-100 dark:border-slate-800">
+    <nav className="fixed bottom-0 left-0 z-50 flex w-full items-center justify-around border-t border-slate-100 bg-white/80 px-4 pb-6 pt-2 backdrop-blur-md dark:border-slate-800 dark:bg-slate-950/80">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeView === tab.id;
@@ -22,14 +22,14 @@ export default function BottomNavBar({ activeView, onViewChange }: BottomNavBarP
           <button
             key={tab.id}
             onClick={() => onViewChange(tab.id)}
-            className={`flex flex-col items-center justify-center px-5 py-1 rounded-xl transition-all tap-highlight-transparent ${
+            className={`tap-highlight-transparent flex flex-col items-center justify-center rounded-xl px-5 py-1 transition-all ${
               isActive
-                ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30'
-                : 'text-slate-400 dark:text-slate-500 hover:text-blue-500'
+                ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                : 'text-slate-400 hover:text-blue-500 dark:text-slate-500'
             }`}
           >
-            <Icon className={`w-6 h-6 ${isActive ? 'fill-current' : ''}`} />
-            <span className="text-[11px] font-medium mt-0.5">{tab.label}</span>
+            <Icon className={`h-6 w-6 ${isActive ? 'fill-current' : ''}`} />
+            <span className="mt-0.5 text-[11px] font-medium">{tab.label}</span>
           </button>
         );
       })}

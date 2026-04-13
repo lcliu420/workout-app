@@ -1,65 +1,79 @@
 import React, { useState } from 'react';
-import { Dumbbell, Mail, Lock, Eye, EyeOff, ArrowRight, X } from 'lucide-react';
+import { ArrowRight, Dumbbell, Eye, EyeOff, Lock, Mail, UserRound } from 'lucide-react';
 
-export default function AuthView({ onLogin }: { onLogin: (msg: string) => void }) {
+interface AuthViewProps {
+  onAuthenticate: (input: {
+    mode: 'login' | 'register';
+    email: string;
+    password: string;
+    displayName?: string;
+  }) => Promise<void>;
+  isPending: boolean;
+  errorMessage: string | null;
+}
+
+export default function AuthView({ onAuthenticate, isPending, errorMessage }: AuthViewProps) {
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
 
-  const handleResetPassword = (event: React.FormEvent) => {
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    alert(`重置密码邮件已发送至: ${resetEmail}`);
-    setIsForgotModalOpen(false);
-  };
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    const successMessage = mode === 'login' ? '登录成功！' : '注册成功！';
-    onLogin(successMessage);
+    await onAuthenticate({
+      mode,
+      email: email.trim(),
+      password,
+      displayName: mode === 'register' ? displayName.trim() : undefined,
+    });
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950">
-      <header className="flex items-center justify-between px-6 h-16 w-full">
+    <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+      <header className="flex h-16 w-full items-center justify-between px-6">
         <div className="flex items-center gap-2">
-          <Dumbbell className="text-blue-600 w-6 h-6 fill-current" />
-          <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-slate-100">健身笔记</span>
+          <Dumbbell className="h-6 w-6 fill-current text-blue-600" />
+          <span className="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            健身系统
+          </span>
         </div>
       </header>
 
-      <main className="flex-grow flex flex-col items-center justify-center px-6 max-w-md mx-auto w-full">
-        <div className="w-full mb-10 text-center">
-          <div className="relative w-24 h-24 mx-auto mb-6">
-            <div className="absolute inset-0 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
-              <Dumbbell className="text-blue-600 dark:text-blue-400 text-4xl w-10 h-10" />
+      <main className="mx-auto flex w-full max-w-md flex-grow flex-col items-center justify-center px-6">
+        <div className="mb-10 w-full text-center">
+          <div className="relative mx-auto mb-6 h-24 w-24">
+            <div className="absolute inset-0 flex items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/30">
+              <Dumbbell className="h-10 w-10 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-100 tracking-tight mb-2">
-            {mode === 'login' ? '欢迎回来' : '开启旅程'}
+          <h1 className="mb-2 text-3xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
+            {mode === 'login' ? '欢迎回来' : '创建你的训练账户'}
           </h1>
-          <p className="text-slate-500 font-medium">
-            {mode === 'login' ? '请登录以继续你的健身之旅' : '创建一个账户来记录你的训练'}
+          <p className="font-medium text-slate-500">
+            {mode === 'login'
+              ? '登录后即可同步训练计划、历史记录和个人资料。'
+              : '注册后，训练计划将保存到 Supabase 云端数据库。'}
           </p>
         </div>
 
-        <div className="w-full flex bg-slate-200/50 dark:bg-slate-800/50 p-1 rounded-full mb-8">
+        <div className="mb-8 flex w-full rounded-full bg-slate-200/50 p-1 dark:bg-slate-800/50">
           <button
             onClick={() => setMode('login')}
-            className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+            className={`flex-1 rounded-full py-2 text-sm font-semibold transition-all ${
               mode === 'login'
-                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400'
+                : 'text-slate-600 hover:text-slate-800 dark:text-slate-400'
             }`}
           >
             登录
           </button>
           <button
             onClick={() => setMode('register')}
-            className={`flex-1 py-2 text-sm font-semibold rounded-full transition-all ${
+            className={`flex-1 rounded-full py-2 text-sm font-semibold transition-all ${
               mode === 'register'
-                ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                ? 'bg-white text-blue-600 shadow-sm dark:bg-slate-700 dark:text-blue-400'
+                : 'text-slate-600 hover:text-slate-800 dark:text-slate-400'
             }`}
           >
             注册
@@ -67,14 +81,39 @@ export default function AuthView({ onLogin }: { onLogin: (msg: string) => void }
         </div>
 
         <form className="w-full space-y-5" onSubmit={handleSubmit}>
+          {mode === 'register' && (
+            <div className="space-y-1.5">
+              <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-500">
+                昵称
+              </label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
+                  <UserRound className="h-5 w-5 text-slate-400" />
+                </div>
+                <input
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  className="w-full rounded-xl bg-white py-3.5 pl-12 pr-4 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-slate-900"
+                  placeholder="请输入昵称"
+                  type="text"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">电子邮箱</label>
+            <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-500">
+              电子邮箱
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <Mail className="text-slate-400 w-5 h-5" />
+              <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
+                <Mail className="h-5 w-5 text-slate-400" />
               </div>
               <input
-                className="w-full bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 rounded-xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-blue-600 focus:outline-none transition-all placeholder:text-slate-300"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                className="w-full rounded-xl bg-white py-3.5 pl-12 pr-4 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-slate-900"
                 placeholder="电子邮箱地址"
                 type="email"
                 required
@@ -83,103 +122,50 @@ export default function AuthView({ onLogin }: { onLogin: (msg: string) => void }
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 uppercase tracking-widest ml-1">密码</label>
+            <label className="ml-1 text-xs font-bold uppercase tracking-widest text-slate-500">
+              密码
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                <Lock className="text-slate-400 w-5 h-5" />
+              <div className="pointer-events-none absolute inset-y-0 left-4 flex items-center">
+                <Lock className="h-5 w-5 text-slate-400" />
               </div>
               <input
-                className="w-full bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 rounded-xl py-3.5 pl-12 pr-12 focus:ring-2 focus:ring-blue-600 focus:outline-none transition-all placeholder:text-slate-300"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="w-full rounded-xl bg-white py-3.5 pl-12 pr-12 placeholder:text-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-slate-900"
                 placeholder="请输入密码"
                 type={showPassword ? 'text' : 'password'}
+                minLength={6}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-4 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                className="absolute inset-y-0 right-4 flex items-center text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-200"
               >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
               </button>
             </div>
           </div>
 
-          {mode === 'login' && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={() => setIsForgotModalOpen(true)}
-                className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-              >
-                忘记密码？
-              </button>
+          {errorMessage && (
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+              {errorMessage}
             </div>
           )}
 
           <div className="pt-4">
             <button
-              className="w-full bg-slate-900 dark:bg-blue-600 text-white font-bold py-4 rounded-xl shadow-md active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 py-4 font-bold text-white shadow-md transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 dark:bg-blue-600"
               type="submit"
+              disabled={isPending}
             >
-              <span>{mode === 'login' ? '登录' : '注册'}</span>
-              <ArrowRight className="w-5 h-5" />
+              <span>{isPending ? '处理中...' : mode === 'login' ? '登录' : '注册并开始使用'}</span>
+              {!isPending && <ArrowRight className="h-5 w-5" />}
             </button>
           </div>
         </form>
-
-        {isForgotModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden">
-              <div className="px-6 py-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                <h3 className="text-xl font-bold text-slate-900 dark:text-slate-100">找回密码</h3>
-                <button
-                  onClick={() => setIsForgotModalOpen(false)}
-                  className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              <form onSubmit={handleResetPassword} className="p-6 space-y-6">
-                <p className="text-sm text-slate-500">
-                  请输入你的注册邮箱，我们将向你发送重置密码的链接。
-                </p>
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-slate-700 dark:text-slate-300 ml-1">电子邮箱</label>
-                  <input
-                    type="email"
-                    value={resetEmail}
-                    onChange={(event) => setResetEmail(event.target.value)}
-                    className="w-full bg-slate-50 dark:bg-slate-800 border-none focus:ring-2 focus:ring-blue-500 rounded-2xl px-4 py-3 text-slate-900 dark:text-slate-100"
-                    placeholder="请输入邮箱地址"
-                    required
-                  />
-                </div>
-
-                <div className="pt-4 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setIsForgotModalOpen(false)}
-                    className="flex-1 px-6 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    取消
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 px-6 py-3 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-500/30"
-                  >
-                    发送邮件
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
       </main>
-
-      <footer className="w-full py-8 text-center">
-        <p className="text-slate-400 text-xs tracking-wide uppercase">© 2024 健身笔记 · 隐私政策</p>
-      </footer>
     </div>
   );
 }

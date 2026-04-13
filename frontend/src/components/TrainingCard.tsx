@@ -1,5 +1,5 @@
 import { Dumbbell } from 'lucide-react';
-import { TrainingSession } from '../types';
+import type { TrainingSession } from '../types';
 
 export default function TrainingCard({ session }: { session: TrainingSession }) {
   return (
@@ -18,14 +18,12 @@ export default function TrainingCard({ session }: { session: TrainingSession }) 
           </tr>
         </thead>
         <tbody className="text-sm">
-          {session.exercises.map((ex) => (
-            <tr key={ex.id} className="border-b border-slate-50/50 dark:border-slate-800/50 last:border-0">
-              <td className="py-3 font-medium text-slate-800 dark:text-slate-300">{ex.name}</td>
-              <td className="py-3 text-center font-semibold text-blue-600 dark:text-blue-400">
-                {ex.load}
-              </td>
-              <td className="py-3 text-center text-slate-500 dark:text-slate-400">{ex.sets}</td>
-              <td className="py-3 text-center text-slate-500 dark:text-slate-400">{ex.reps}</td>
+          {session.exercises.map((exercise) => (
+            <tr key={exercise.id} className="border-b border-slate-50/50 dark:border-slate-800/50 last:border-0">
+              <td className="py-3 font-medium text-slate-800 dark:text-slate-300">{exercise.name}</td>
+              <td className="py-3 text-center font-semibold text-blue-600 dark:text-blue-400">{exercise.load}</td>
+              <td className="py-3 text-center text-slate-500 dark:text-slate-400">{exercise.sets}</td>
+              <td className="py-3 text-center text-slate-500 dark:text-slate-400">{exercise.reps}</td>
             </tr>
           ))}
         </tbody>
