@@ -7,10 +7,23 @@ import { trainingRouter } from './modules/training/training.routes.js';
 import { errorHandler } from './middleware/error-handler.js';
 
 const app = express();
+const allowedOrigins = new Set(
+  env.FRONTEND_URL.split(',')
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+    .concat(['http://localhost', 'https://localhost']),
+);
 
 app.use(
   cors({
-    origin: env.FRONTEND_URL,
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.has(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    },
     credentials: false,
   }),
 );
