@@ -1,6 +1,5 @@
 import { HttpError } from '../../lib/http-error.js';
 import { supabaseAdmin } from '../../lib/supabase.js';
-import { getIsoWeekParts } from '../../utils/date.js';
 import type { SaveCurrentWeekInput } from './training.schemas.js';
 
 type WeekRow = {
@@ -29,14 +28,13 @@ type ExerciseRow = {
 };
 
 async function getOrCreateCurrentWeek(userId: string) {
-  const { year, weekNumber } = getIsoWeekParts();
-
   const { data: existingWeek, error: existingError } = await supabaseAdmin
     .from('training_weeks')
     .select('id, training_year, week_number, created_at')
     .eq('user_id', userId)
-    .eq('training_year', year)
-    .eq('week_number', weekNumber)
+    .order('training_year', { ascending: false })
+    .order('week_number', { ascending: false })
+    .limit(1)
     .maybeSingle<WeekRow>();
 
   if (existingError) {
@@ -47,12 +45,14 @@ async function getOrCreateCurrentWeek(userId: string) {
     return existingWeek;
   }
 
+  const fallbackYear = new Date().getFullYear();
+
   const { data: createdWeek, error: createError } = await supabaseAdmin
     .from('training_weeks')
     .insert({
       user_id: userId,
-      training_year: year,
-      week_number: weekNumber,
+      training_year: fallbackYear,
+      week_number: 1,
     })
     .select('id, training_year, week_number, created_at')
     .single<WeekRow>();

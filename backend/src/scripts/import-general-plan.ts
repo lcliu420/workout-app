@@ -21,8 +21,7 @@ const TARGET_EMAIL = '1328119115@qq.com';
 const SESSION_START_COLUMNS = [1, 4, 7, 10, 13, 16];
 const WEEK_ROW_MARKER_FIRST = 31532;
 const WEEK_ROW_MARKER_LAST = 21608;
-const YEAR = Number(process.env.TRAINING_YEAR_OVERRIDE || new Date().getFullYear());
-const CURRENT_WEEK = Number(process.env.TRAINING_WEEK_OVERRIDE || 56);
+const YEAR = new Date().getFullYear();
 
 function isWeekLabel(value: string) {
   return (
@@ -35,7 +34,7 @@ function isWeekLabel(value: string) {
 function extractWeekNumber(label: string) {
   const matched = label.match(/\d+/);
   if (!matched) {
-    throw new Error(`无法解析周次: ${label}`);
+    throw new Error(`Unable to parse week number from label: ${label}`);
   }
 
   return Number(matched[0]);
@@ -88,7 +87,7 @@ function parseSessions(headerRow: string[], bodyRows: string[][]) {
     }
 
     return {
-      title: title || `第${sessionIndex + 1}练`,
+      title: title || `Session ${sessionIndex + 1}`,
       orderIndex: sessionIndex,
       exercises,
     };
@@ -135,12 +134,12 @@ async function main() {
     .single<{ id: string; email: string }>();
 
   if (profileError || !profile) {
-    throw new Error(`未找到目标用户 ${TARGET_EMAIL}: ${profileError?.message ?? 'unknown error'}`);
+    throw new Error(`Target user not found: ${TARGET_EMAIL}: ${profileError?.message ?? 'unknown error'}`);
   }
 
   const { error: deleteError } = await supabase.from('training_weeks').delete().eq('user_id', profile.id);
   if (deleteError) {
-    throw new Error(`清理旧训练数据失败: ${deleteError.message}`);
+    throw new Error(`Failed to clear existing training data: ${deleteError.message}`);
   }
 
   const weekPayloads = buildWeekPayloads();
@@ -157,7 +156,7 @@ async function main() {
       .single<{ id: string }>();
 
     if (weekError || !week) {
-      throw new Error(`创建第 ${weekPayload.weekNumber} 周失败: ${weekError?.message ?? 'unknown error'}`);
+      throw new Error(`Failed to create week ${weekPayload.weekNumber}: ${weekError?.message ?? 'unknown error'}`);
     }
 
     for (const session of weekPayload.sessions) {
@@ -172,7 +171,7 @@ async function main() {
         .single<{ id: string }>();
 
       if (sessionError || !sessionRow) {
-        throw new Error(`创建训练 ${session.title} 失败: ${sessionError?.message ?? 'unknown error'}`);
+        throw new Error(`Failed to create session ${session.title}: ${sessionError?.message ?? 'unknown error'}`);
       }
 
       if (session.exercises.length > 0) {
@@ -188,32 +187,22 @@ async function main() {
         );
 
         if (exerciseError) {
-          throw new Error(`导入训练 ${session.title} 的动作失败: ${exerciseError.message}`);
+          throw new Error(`Failed to import exercises for ${session.title}: ${exerciseError.message}`);
         }
       }
     }
   }
 
-  const { error: currentWeekError } = await supabase.from('training_weeks').upsert(
-    {
-      user_id: profile.id,
-      training_year: YEAR,
-      week_number: CURRENT_WEEK,
-    },
-    {
-      onConflict: 'user_id,training_year,week_number',
-    },
+  const latestWeekNumber = weekPayloads.reduce(
+    (maxWeekNumber, weekPayload) => Math.max(maxWeekNumber, weekPayload.weekNumber),
+    0,
   );
-
-  if (currentWeekError) {
-    throw new Error(`创建当前周失败: ${currentWeekError.message}`);
-  }
 
   console.log(
     JSON.stringify(
       {
         importedWeeks: weekPayloads.length,
-        currentWeek: CURRENT_WEEK,
+        latestWeekNumber,
         targetEmail: TARGET_EMAIL,
       },
       null,
