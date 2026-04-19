@@ -10,6 +10,7 @@ import type {
   WeeklyGroup,
 } from './types';
 import {
+  advanceCurrentWeek,
   ApiError,
   getCurrentUser,
   getTrainingOverview,
@@ -125,9 +126,11 @@ export default function App() {
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [isTrainingLoading, setIsTrainingLoading] = useState(false);
   const [isSavingWeek, setIsSavingWeek] = useState(false);
+  const [isAdvancingWeek, setIsAdvancingWeek] = useState(false);
   const [savingSummaryWeekId, setSavingSummaryWeekId] = useState<string | null>(null);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [isAdvanceWeekDialogOpen, setIsAdvanceWeekDialogOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<{
     isOpen: boolean;
     weekId: string | null;
@@ -391,6 +394,25 @@ export default function App() {
     }
   };
 
+  const handleAdvanceWeek = async () => {
+    if (!authSession || !currentWeek) return;
+
+    try {
+      setIsAdvancingWeek(true);
+      const previousWeekNumber = currentWeek.weekNumber;
+      const overview = await advanceCurrentWeek(authSession.accessToken, {
+        sessions: sanitizeSessionsForSave(currentWeek.sessions),
+      });
+      setTrainingOverview(overview);
+      setIsAdvanceWeekDialogOpen(false);
+      showToast(`第 ${previousWeekNumber} 周计划已保存，已开启第 ${overview.currentWeekNumber} 周。`);
+    } catch (error) {
+      showToast(getErrorMessage(error));
+    } finally {
+      setIsAdvancingWeek(false);
+    }
+  };
+
   const handleSaveSummaryWeek = async (weekId: string) => {
     if (!authSession || !trainingOverview) return;
 
@@ -485,10 +507,12 @@ export default function App() {
             weekNumber={trainingOverview.currentWeekNumber}
             sessions={currentWeek.sessions}
             isSaving={isSavingWeek}
+            isAdvancingWeek={isAdvancingWeek}
             onUpdateSession={handleUpdateCurrentWeekSession}
             onAddSession={handleAddSession}
             onRemoveSession={(sessionId) => initiateRemoveSession(currentWeek.id, sessionId)}
             onSave={handleSaveData}
+            onAdvanceWeek={() => setIsAdvanceWeekDialogOpen(true)}
           />
         );
       case 'account':
@@ -558,6 +582,24 @@ export default function App() {
         message={`你确定要删除“${confirmState.sessionTitle ?? ''}”吗？这次删除会在下次保存时同步到云端。`}
         onConfirm={handleConfirmRemove}
         onCancel={resetConfirmState}
+      />
+
+      <ConfirmDialog
+        isOpen={isAdvanceWeekDialogOpen}
+        title="开启新一周训练计划"
+        message={`确认后会先保存第 ${trainingOverview?.currentWeekNumber ?? ''} 周计划，然后切换到下一周。`}
+        onConfirm={() => {
+          void handleAdvanceWeek();
+        }}
+        onCancel={() => {
+          if (!isAdvancingWeek) {
+            setIsAdvanceWeekDialogOpen(false);
+          }
+        }}
+        confirmLabel="确认开启"
+        cancelLabel="再想想"
+        isPending={isAdvancingWeek}
+        confirmTone="primary"
       />
     </div>
   );

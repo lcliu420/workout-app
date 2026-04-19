@@ -105,6 +105,14 @@ export function saveCurrentWeek(token: string, input: SaveWeekInput) {
   });
 }
 
+export function advanceCurrentWeek(token: string, input: SaveWeekInput) {
+  return request<TrainingOverview>('/training/weeks/current/advance', {
+    method: 'POST',
+    body: input,
+    token,
+  });
+}
+
 export function saveTrainingWeek(token: string, weekId: string, input: SaveWeekInput) {
   return request<TrainingOverview>(`/training/weeks/${weekId}`, {
     method: 'PUT',

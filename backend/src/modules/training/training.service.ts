@@ -83,6 +83,42 @@ async function getWeekOrThrow(userId: string, weekId: string) {
   return data;
 }
 
+async function getOrCreateNextWeek(userId: string, currentWeek: WeekRow) {
+  const nextWeekNumber = currentWeek.week_number + 1;
+
+  const { data: existingWeek, error: existingError } = await supabaseAdmin
+    .from('training_weeks')
+    .select('id, training_year, week_number, created_at')
+    .eq('user_id', userId)
+    .eq('training_year', currentWeek.training_year)
+    .eq('week_number', nextWeekNumber)
+    .maybeSingle<WeekRow>();
+
+  if (existingError) {
+    throw new HttpError(500, `读取下一周训练计划失败: ${existingError.message}`);
+  }
+
+  if (existingWeek) {
+    return existingWeek;
+  }
+
+  const { data: createdWeek, error: createError } = await supabaseAdmin
+    .from('training_weeks')
+    .insert({
+      user_id: userId,
+      training_year: currentWeek.training_year,
+      week_number: nextWeekNumber,
+    })
+    .select('id, training_year, week_number, created_at')
+    .single<WeekRow>();
+
+  if (createError || !createdWeek) {
+    throw new HttpError(500, `创建下一周训练计划失败: ${createError?.message ?? '未知错误'}`);
+  }
+
+  return createdWeek;
+}
+
 async function fetchWeekIds(userId: string) {
   const { data, error } = await supabaseAdmin.from('training_weeks').select('id').eq('user_id', userId);
 
@@ -282,4 +318,19 @@ export async function saveWeekById(userId: string, weekId: string, input: SaveCu
   await getWeekOrThrow(userId, weekId);
   await saveWeekData(weekId, input);
   return getTrainingOverview(userId);
+}
+
+export async function advanceCurrentWeek(userId: string, input: SaveCurrentWeekInput) {
+  const currentWeek = await getOrCreateCurrentWeek(userId);
+  await saveWeekData(currentWeek.id, input);
+
+  const nextWeek = await getOrCreateNextWeek(userId, currentWeek);
+  const graph = await fetchTrainingGraph(userId);
+
+  return {
+    currentWeekId: nextWeek.id,
+    currentWeekNumber: nextWeek.week_number,
+    currentYear: nextWeek.training_year,
+    weeks: buildTrainingResponse(graph, nextWeek.id),
+  };
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { requireAuth } from '../../middleware/auth.js';
-import { getTrainingOverview, saveCurrentWeek, saveWeekById } from './training.service.js';
+import { advanceCurrentWeek, getTrainingOverview, saveCurrentWeek, saveWeekById } from './training.service.js';
 import { saveCurrentWeekSchema } from './training.schemas.js';
 
 export const trainingRouter = Router();
@@ -18,6 +18,16 @@ trainingRouter.put('/weeks/current', requireAuth, async (request, response, next
   try {
     const input = saveCurrentWeekSchema.parse(request.body);
     const result = await saveCurrentWeek(request.user!.id, input);
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+trainingRouter.post('/weeks/current/advance', requireAuth, async (request, response, next) => {
+  try {
+    const input = saveCurrentWeekSchema.parse(request.body);
+    const result = await advanceCurrentWeek(request.user!.id, input);
     response.json(result);
   } catch (error) {
     next(error);

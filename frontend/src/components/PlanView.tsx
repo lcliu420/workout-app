@@ -1,14 +1,16 @@
-import { PlusCircle, Save, Trash2 } from 'lucide-react';
+import { CalendarPlus, PlusCircle, Save, Trash2 } from 'lucide-react';
 import type { Exercise, TrainingSession } from '../types';
 
 interface PlanViewProps {
   weekNumber: number;
   sessions: TrainingSession[];
   isSaving: boolean;
+  isAdvancingWeek: boolean;
   onUpdateSession: (sessionId: string, exercises: Exercise[]) => void;
   onAddSession: () => void;
   onRemoveSession: (sessionId: string) => void;
   onSave: () => Promise<void>;
+  onAdvanceWeek: () => void;
 }
 
 function createEmptyExercise(): Exercise {
@@ -29,10 +31,12 @@ export default function PlanView({
   weekNumber,
   sessions,
   isSaving,
+  isAdvancingWeek,
   onUpdateSession,
   onAddSession,
   onRemoveSession,
   onSave,
+  onAdvanceWeek,
 }: PlanViewProps) {
   const handleInputChange = (
     sessionId: string,
@@ -92,18 +96,26 @@ export default function PlanView({
       <div className="flex items-center justify-between px-2">
         <div>
           <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-100">本周训练计划</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            第 {weekNumber} 周的训练安排会统一同步到 Supabase。
-          </p>
+          <p className="mt-1 text-sm text-slate-500">第 {weekNumber} 周的训练安排会同步保存到云端。</p>
         </div>
-        <button
-          onClick={() => void onSave()}
-          disabled={isSaving}
-          className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-700"
-        >
-          <Save className="h-4 w-4" />
-          <span>{isSaving ? '保存中...' : '保存'}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onAdvanceWeek}
+            disabled={isSaving || isAdvancingWeek}
+            className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-bold text-blue-700 shadow-sm transition-all active:scale-95 disabled:opacity-60 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300"
+          >
+            <CalendarPlus className="h-4 w-4" />
+            <span>{isAdvancingWeek ? '开启中...' : '开启新一周'}</span>
+          </button>
+          <button
+            onClick={() => void onSave()}
+            disabled={isSaving || isAdvancingWeek}
+            className="flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all active:scale-95 disabled:opacity-60 dark:bg-blue-600 dark:hover:bg-blue-700"
+          >
+            <Save className="h-4 w-4" />
+            <span>{isSaving ? '保存中...' : '保存'}</span>
+          </button>
+        </div>
       </div>
 
       {sessions.length === 0 && (
@@ -117,9 +129,7 @@ export default function PlanView({
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <div className="h-6 w-1 rounded-full bg-blue-600"></div>
-              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">
-                {session.title}
-              </h3>
+              <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">{session.title}</h3>
             </div>
             <button
               onClick={() => onRemoveSession(session.id)}
