@@ -8,7 +8,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "lint": "tsc --noEmit",
-    "import:general-plan": "tsx src/scripts/import-general-plan.ts"
+    "import:general-plan": "tsx src/scripts/import-general-plan.ts",
+    "generate:plan-sql": "tsx src/scripts/generate-plan-import-sql.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",

@@ -8,7 +8,18 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 const require = createRequire(import.meta.url);
 const XLSX = require('../../../frontend/node_modules/xlsx');
 
-const workbookPath = path.resolve(process.cwd(), '../plan-import.xlsx');
+function resolveWorkbookPath() {
+  const configuredPath = process.env.PLAN_IMPORT_FILE?.trim();
+  if (!configuredPath) {
+    return path.resolve(process.cwd(), '../plan-import.xlsx');
+  }
+
+  return path.isAbsolute(configuredPath)
+    ? configuredPath
+    : path.resolve(process.cwd(), configuredPath);
+}
+
+const workbookPath = resolveWorkbookPath();
 const workbook = XLSX.readFile(workbookPath);
 const sheet = workbook.Sheets[workbook.SheetNames[0]];
 const rows: string[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -17,11 +28,12 @@ const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SE
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const TARGET_EMAIL = '1328119115@qq.com';
+const TARGET_EMAIL = process.env.PLAN_IMPORT_TARGET_EMAIL?.trim();
+const TARGET_USER_ID = process.env.PLAN_IMPORT_TARGET_USER_ID?.trim();
 const SESSION_START_COLUMNS = [1, 4, 7, 10, 13, 16];
 const WEEK_ROW_MARKER_FIRST = 31532;
 const WEEK_ROW_MARKER_LAST = 21608;
-const YEAR = new Date().getFullYear();
+const YEAR = Number.parseInt(process.env.PLAN_IMPORT_YEAR ?? '', 10) || new Date().getFullYear();
 
 function isWeekLabel(value: string) {
   return (
@@ -127,14 +139,23 @@ function buildWeekPayloads() {
 }
 
 async function main() {
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('id, email')
-    .eq('email', TARGET_EMAIL)
-    .single<{ id: string; email: string }>();
+  if (!TARGET_EMAIL && !TARGET_USER_ID) {
+    throw new Error('Missing import target. Set PLAN_IMPORT_TARGET_EMAIL or PLAN_IMPORT_TARGET_USER_ID.');
+  }
+
+  let profileQuery = supabase.from('profiles').select('id, email');
+  if (TARGET_USER_ID) {
+    profileQuery = profileQuery.eq('id', TARGET_USER_ID);
+  } else {
+    profileQuery = profileQuery.eq('email', TARGET_EMAIL!);
+  }
+
+  const { data: profile, error: profileError } = await profileQuery.single<{ id: string; email: string }>();
 
   if (profileError || !profile) {
-    throw new Error(`Target user not found: ${TARGET_EMAIL}: ${profileError?.message ?? 'unknown error'}`);
+    throw new Error(
+      `Target user not found: ${TARGET_USER_ID ?? TARGET_EMAIL}: ${profileError?.message ?? 'unknown error'}`,
+    );
   }
 
   const { error: deleteError } = await supabase.from('training_weeks').delete().eq('user_id', profile.id);
@@ -203,7 +224,10 @@ async function main() {
       {
         importedWeeks: weekPayloads.length,
         latestWeekNumber,
+        workbookPath,
         targetEmail: TARGET_EMAIL,
+        targetUserId: TARGET_USER_ID,
+        importYear: YEAR,
       },
       null,
       2,

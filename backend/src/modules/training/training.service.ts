@@ -27,6 +27,9 @@ type ExerciseRow = {
   order_index: number;
 };
 
+const EMPTY_UUID = '00000000-0000-0000-0000-000000000000';
+const PAGE_SIZE = 1000;
+
 async function getOrCreateCurrentWeek(userId: string) {
   const { data: existingWeek, error: existingError } = await supabaseAdmin
     .from('training_weeks')
@@ -38,7 +41,7 @@ async function getOrCreateCurrentWeek(userId: string) {
     .maybeSingle<WeekRow>();
 
   if (existingError) {
-    throw new HttpError(500, `读取当前训练周失败: ${existingError.message}`);
+    throw new HttpError(500, `Failed to read current training week: ${existingError.message}`);
   }
 
   if (existingWeek) {
@@ -58,7 +61,10 @@ async function getOrCreateCurrentWeek(userId: string) {
     .single<WeekRow>();
 
   if (createError || !createdWeek) {
-    throw new HttpError(500, `创建当前训练周失败: ${createError?.message ?? '未知错误'}`);
+    throw new HttpError(
+      500,
+      `Failed to create current training week: ${createError?.message ?? 'unknown error'}`,
+    );
   }
 
   return createdWeek;
@@ -73,11 +79,11 @@ async function getWeekOrThrow(userId: string, weekId: string) {
     .maybeSingle<WeekRow>();
 
   if (error) {
-    throw new HttpError(500, `读取训练周失败: ${error.message}`);
+    throw new HttpError(500, `Failed to read training week: ${error.message}`);
   }
 
   if (!data) {
-    throw new HttpError(404, '未找到指定训练周');
+    throw new HttpError(404, 'Training week not found');
   }
 
   return data;
@@ -95,7 +101,7 @@ async function getOrCreateNextWeek(userId: string, currentWeek: WeekRow) {
     .maybeSingle<WeekRow>();
 
   if (existingError) {
-    throw new HttpError(500, `读取下一周训练计划失败: ${existingError.message}`);
+    throw new HttpError(500, `Failed to read next training week: ${existingError.message}`);
   }
 
   if (existingWeek) {
@@ -113,62 +119,135 @@ async function getOrCreateNextWeek(userId: string, currentWeek: WeekRow) {
     .single<WeekRow>();
 
   if (createError || !createdWeek) {
-    throw new HttpError(500, `创建下一周训练计划失败: ${createError?.message ?? '未知错误'}`);
+    throw new HttpError(
+      500,
+      `Failed to create next training week: ${createError?.message ?? 'unknown error'}`,
+    );
   }
 
   return createdWeek;
 }
 
 async function fetchWeekIds(userId: string) {
-  const { data, error } = await supabaseAdmin.from('training_weeks').select('id').eq('user_id', userId);
+  const weekIds: string[] = [];
+  let from = 0;
 
-  if (error) {
-    throw new HttpError(500, `读取训练周列表失败: ${error.message}`);
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('training_weeks')
+      .select('id')
+      .eq('user_id', userId)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) {
+      throw new HttpError(500, `Failed to read training week ids: ${error.message}`);
+    }
+
+    const batch = (data ?? []).map((item) => item.id as string);
+    weekIds.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    from += PAGE_SIZE;
   }
 
-  return (data ?? []).map((item) => item.id as string);
+  return weekIds;
 }
 
 async function fetchTrainingGraph(userId: string) {
   const weekIds = await fetchWeekIds(userId);
+  const filterWeekIds = weekIds.length > 0 ? weekIds : [EMPTY_UUID];
 
-  const { data: weeks, error: weeksError } = await supabaseAdmin
-    .from('training_weeks')
-    .select('id, training_year, week_number, created_at')
-    .eq('user_id', userId)
-    .order('training_year', { ascending: false })
-    .order('week_number', { ascending: false });
+  const weeks: WeekRow[] = [];
+  let weekFrom = 0;
 
-  if (weeksError) {
-    throw new HttpError(500, `读取训练周失败: ${weeksError.message}`);
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('training_weeks')
+      .select('id, training_year, week_number, created_at')
+      .eq('user_id', userId)
+      .order('training_year', { ascending: false })
+      .order('week_number', { ascending: false })
+      .order('id', { ascending: true })
+      .range(weekFrom, weekFrom + PAGE_SIZE - 1);
+
+    if (error) {
+      throw new HttpError(500, `Failed to read training weeks: ${error.message}`);
+    }
+
+    const batch = (data ?? []) as WeekRow[];
+    weeks.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    weekFrom += PAGE_SIZE;
   }
 
-  const { data: sessions, error: sessionsError } = await supabaseAdmin
-    .from('training_sessions')
-    .select('id, week_id, title, order_index, created_at')
-    .in('week_id', weekIds.length > 0 ? weekIds : ['00000000-0000-0000-0000-000000000000'])
-    .order('order_index', { ascending: true });
+  const sessions: SessionRow[] = [];
+  let sessionFrom = 0;
 
-  if (sessionsError) {
-    throw new HttpError(500, `读取训练课表失败: ${sessionsError.message}`);
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('training_sessions')
+      .select('id, week_id, title, order_index, created_at')
+      .in('week_id', filterWeekIds)
+      .order('week_id', { ascending: true })
+      .order('order_index', { ascending: true })
+      .order('id', { ascending: true })
+      .range(sessionFrom, sessionFrom + PAGE_SIZE - 1);
+
+    if (error) {
+      throw new HttpError(500, `Failed to read training sessions: ${error.message}`);
+    }
+
+    const batch = (data ?? []) as SessionRow[];
+    sessions.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    sessionFrom += PAGE_SIZE;
   }
 
-  const sessionIds = (sessions ?? []).map((item) => item.id);
+  const sessionIds = sessions.map((item) => item.id);
+  const filterSessionIds = sessionIds.length > 0 ? sessionIds : [EMPTY_UUID];
+  const exercises: ExerciseRow[] = [];
+  let exerciseFrom = 0;
 
-  const { data: exercises, error: exercisesError } = await supabaseAdmin
-    .from('training_exercises')
-    .select('id, session_id, name, sets, reps, load, order_index')
-    .in('session_id', sessionIds.length > 0 ? sessionIds : ['00000000-0000-0000-0000-000000000000'])
-    .order('order_index', { ascending: true });
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('training_exercises')
+      .select('id, session_id, name, sets, reps, load, order_index')
+      .in('session_id', filterSessionIds)
+      .order('session_id', { ascending: true })
+      .order('order_index', { ascending: true })
+      .order('id', { ascending: true })
+      .range(exerciseFrom, exerciseFrom + PAGE_SIZE - 1);
 
-  if (exercisesError) {
-    throw new HttpError(500, `读取训练动作失败: ${exercisesError.message}`);
+    if (error) {
+      throw new HttpError(500, `Failed to read training exercises: ${error.message}`);
+    }
+
+    const batch = (data ?? []) as ExerciseRow[];
+    exercises.push(...batch);
+
+    if (batch.length < PAGE_SIZE) {
+      break;
+    }
+
+    exerciseFrom += PAGE_SIZE;
   }
 
   return {
-    weeks: (weeks ?? []) as WeekRow[],
-    sessions: (sessions ?? []) as SessionRow[],
-    exercises: (exercises ?? []) as ExerciseRow[],
+    weeks,
+    sessions,
+    exercises,
   };
 }
 
@@ -213,7 +292,7 @@ async function replaceExercises(
     .eq('session_id', sessionId);
 
   if (deleteError) {
-    throw new HttpError(500, `重建训练动作失败: ${deleteError.message}`);
+    throw new HttpError(500, `Failed to rebuild training exercises: ${deleteError.message}`);
   }
 
   if (exercises.length === 0) {
@@ -232,8 +311,9 @@ async function replaceExercises(
   );
 
   if (insertError) {
-    throw new HttpError(500, `保存训练动作失败: ${insertError.message}`);
+    throw new HttpError(500, `Failed to save training exercises: ${insertError.message}`);
   }
+
   const { data: savedExercises, error: verifyError } = await supabaseAdmin
     .from('training_exercises')
     .select('order_index')
@@ -241,13 +321,13 @@ async function replaceExercises(
     .order('order_index', { ascending: true });
 
   if (verifyError) {
-    throw new HttpError(500, `镜像校验训练动作失败: ${verifyError.message}`);
+    throw new HttpError(500, `Failed to verify saved exercises: ${verifyError.message}`);
   }
 
   if ((savedExercises ?? []).length !== exercises.length) {
     throw new HttpError(
       500,
-      `训练动作写入数量异常: 预期 ${exercises.length} 条，实际 ${(savedExercises ?? []).length} 条。请检查 Supabase 中 training_exercises 表的约束、触发器或旧结构。`,
+      `Exercise row count mismatch: expected ${exercises.length}, got ${(savedExercises ?? []).length}.`,
     );
   }
 }
@@ -259,7 +339,7 @@ async function saveWeekData(weekId: string, input: SaveCurrentWeekInput) {
     .eq('week_id', weekId);
 
   if (sessionsError) {
-    throw new HttpError(500, `读取现有训练失败: ${sessionsError.message}`);
+    throw new HttpError(500, `Failed to read existing training sessions: ${sessionsError.message}`);
   }
 
   const existingIds = new Set((existingSessions ?? []).map((item) => item.id as string));
@@ -267,9 +347,13 @@ async function saveWeekData(weekId: string, input: SaveCurrentWeekInput) {
 
   const toDelete = [...existingIds].filter((id) => !incomingIds.has(id));
   if (toDelete.length > 0) {
-    const { error: deleteError } = await supabaseAdmin.from('training_sessions').delete().in('id', toDelete);
+    const { error: deleteError } = await supabaseAdmin
+      .from('training_sessions')
+      .delete()
+      .in('id', toDelete);
+
     if (deleteError) {
-      throw new HttpError(500, `删除训练失败: ${deleteError.message}`);
+      throw new HttpError(500, `Failed to delete training sessions: ${deleteError.message}`);
     }
   }
 
@@ -287,7 +371,7 @@ async function saveWeekData(weekId: string, input: SaveCurrentWeekInput) {
         .eq('week_id', weekId);
 
       if (updateError) {
-        throw new HttpError(500, `更新训练失败: ${updateError.message}`);
+        throw new HttpError(500, `Failed to update training session: ${updateError.message}`);
       }
 
       await replaceExercises(session.id, session.exercises);
@@ -305,7 +389,10 @@ async function saveWeekData(weekId: string, input: SaveCurrentWeekInput) {
       .single<{ id: string }>();
 
     if (insertError || !createdSession) {
-      throw new HttpError(500, `创建训练失败: ${insertError?.message ?? '未知错误'}`);
+      throw new HttpError(
+        500,
+        `Failed to create training session: ${insertError?.message ?? 'unknown error'}`,
+      );
     }
 
     await replaceExercises(createdSession.id, session.exercises);
