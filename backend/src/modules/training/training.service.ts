@@ -234,6 +234,22 @@ async function replaceExercises(
   if (insertError) {
     throw new HttpError(500, `保存训练动作失败: ${insertError.message}`);
   }
+  const { data: savedExercises, error: verifyError } = await supabaseAdmin
+    .from('training_exercises')
+    .select('order_index')
+    .eq('session_id', sessionId)
+    .order('order_index', { ascending: true });
+
+  if (verifyError) {
+    throw new HttpError(500, `镜像校验训练动作失败: ${verifyError.message}`);
+  }
+
+  if ((savedExercises ?? []).length !== exercises.length) {
+    throw new HttpError(
+      500,
+      `训练动作写入数量异常: 预期 ${exercises.length} 条，实际 ${(savedExercises ?? []).length} 条。请检查 Supabase 中 training_exercises 表的约束、触发器或旧结构。`,
+    );
+  }
 }
 
 async function saveWeekData(weekId: string, input: SaveCurrentWeekInput) {

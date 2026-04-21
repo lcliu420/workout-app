@@ -2,10 +2,18 @@ import type { AuthResponse, TrainingOverview, UserProfile } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
+type ApiErrorIssue = {
+  path: string;
+  message: string;
+};
+
 export class ApiError extends Error {
-  constructor(message: string) {
+  issues: ApiErrorIssue[];
+
+  constructor(message: string, issues: ApiErrorIssue[] = []) {
     super(message);
     this.name = 'ApiError';
+    this.issues = issues;
   }
 }
 
@@ -40,10 +48,21 @@ async function request<T>(path: string, options: RequestOptions = {}) {
     body: options.body ? JSON.stringify(options.body) : undefined,
   });
 
-  const payload = (await response.json().catch(() => ({}))) as { message?: string } & T;
+  const payload = (await response.json().catch(() => ({}))) as {
+    message?: string;
+    issues?: ApiErrorIssue[];
+  } & T;
 
   if (!response.ok) {
-    throw new ApiError(payload.message ?? '请求失败，请稍后再试。');
+    const issues = Array.isArray(payload.issues) ? payload.issues : [];
+    const details = issues
+      .map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message))
+      .join('；');
+
+    throw new ApiError(
+      details ? `${payload.message ?? '请求失败，请稍后再试。'}：${details}` : payload.message ?? '请求失败，请稍后再试。',
+      issues,
+    );
   }
 
   return payload;
